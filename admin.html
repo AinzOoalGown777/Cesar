@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+    <title>Login de Administrador</title>
+    <style>
+        .room-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            padding: 20px;
+        }
+        .room-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 20px;
+            font-size: 16px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.3s;
+            position: relative;
+        }
+        .room-button:hover {
+            background-color: #45a049;
+        }
+        .room-details {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background-color: white;
+            padding: 10px;
+            border: 1px solid #ccc;
+            width: 100%;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            z-index: 1;
+        }
+        .room-button:hover .room-details {
+            display: block;
+        }
+        .room-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 20px;
+            font-size: 16px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            border-radius: 12px;
+            transition: background-color 0.3s;
+            position: relative;
+        }
+        
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Login de Administrador</h1>
+    </header>
+    <div class="container">
+        <input type="text" id="admin-id" placeholder="ID de Administrador">
+        <input type="password" id="admin-password" placeholder="Contraseña">
+        <button onclick="adminLogin()">Ingresar</button>
+    </div>
+    <div id="admin-panel" style="display: none;">
+        <h2>Panel de Administración</h2>
+        <div id="room-grid" class="room-grid"></div>
+    </div>
+
+    <script>
+        function fetchCredentials() {
+            return fetch('https://sheets.googleapis.com/v4/spreadsheets/1q2CPWA_Rr9DF6_DF3dt2cjCN1n5b-pgXIf-WCUVc58g/values/USER?key=AIzaSyD7yqnBROrP5-RO4ykJxoE4BRva8pJd5y0')
+                .then(response => response.json())
+                .then(data => {
+                    const values = data.values;
+                    if (values && values.length > 0) {
+                        return {
+                            id: values[0][0],
+                            password: values[0][1]
+                        };
+                    } else {
+                        throw new Error('No se encontraron credenciales');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al obtener credenciales:', error);
+                    alert('Error al cargar las credenciales');
+                    return null;
+                });
+        }
+        async function saveRoomData() {
+            const roomData = [];
+            
+            for (let i = 0; i < 16; i++) {
+                const name = document.getElementById(`room-name-${i}`).value;
+                const price = document.getElementById(`price-${i}`).value;
+                const availability = document.getElementById(`availability-${i}`).value;
+                const reservationName = document.getElementById(`reservation-name-${i}`).value;
+                roomData.push([name, price, availability, reservationName]);
+            }
+            
+            const sheetId = '1q2CPWA_Rr9DF6_DF3dt2cjCN1n5b-pgXIf-WCUVc58g';  // Tu ID de la hoja
+            const range = 'HABITACIONES!A1:D16';  // El rango en la hoja donde se guardarán los datos
+            const apiKey = 'AIzaSyD2GYl4i2u3BqeB_NFRkZH9aRSg9BZH-EE';  // Tu clave de API
+        
+            try {
+                // Enviar los datos a Google Sheets usando la API
+                const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?valueInputOption=USER_ENTERED&key=${apiKey}`, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        values: roomData  // Estos son los datos que se actualizarán en la hoja
+                    })
+                });
+        
+                if (response.ok) {
+                    console.log('Datos guardados correctamente en Google Sheets');
+                    alert('Datos guardados exitosamente');
+                } else {
+                    console.error('Error al actualizar los datos en Google Sheets:', response.statusText);
+                    alert('Hubo un error al guardar los datos');
+                }
+            } catch (error) {
+                console.error('Error en la solicitud:', error);
+                alert('Error al actualizar los datos en Google Sheets');
+            }
+        }        
+        
+        function fetchRoomData() {
+            return fetch('https://sheets.googleapis.com/v4/spreadsheets/1q2CPWA_Rr9DF6_DF3dt2cjCN1n5b-pgXIf-WCUVc58g/values/HABITACIONES?key=AIzaSyD7yqnBROrP5-RO4ykJxoE4BRva8pJd5y0')
+                .then(response => response.json())
+                .then(data => data.values || [])
+                .catch(error => {
+                    console.error('Error al obtener datos de habitaciones:', error);
+                    alert('Error al cargar datos de habitaciones');
+                    return [];
+                });
+        }
+
+        async function adminLogin() {
+            const adminId = document.getElementById('admin-id').value;
+            const adminPassword = document.getElementById('admin-password').value;
+            const credentials = await fetchCredentials();
+
+            if (credentials && adminId === credentials.id && adminPassword === credentials.password) {
+                document.querySelector('.container').style.display = 'none';
+                document.getElementById('admin-panel').style.display = 'block';
+                alert("Acceso concedido");
+                loadRooms();
+            } else {
+                alert("Credenciales incorrectas");
+            }
+        }
+
+        async function loadRooms() {
+            const roomData = await fetchRoomData();
+            const roomGrid = document.getElementById('room-grid');
+            roomGrid.innerHTML = '';
+        
+            roomData.slice(0, 16).forEach((room, index) => {
+                const roomButton = document.createElement('button');
+                roomButton.classList.add('room-button');
+                roomButton.innerText = `Habitación ${index + 1}`;
+        
+                const roomDetails = document.createElement('div');
+                roomDetails.classList.add('room-details');
+                roomDetails.innerHTML = `
+                    <p><strong>Nombre:</strong> <input type="text" value="${room[0]}" id="room-name-${index}"></p>
+                    <p><strong>Precio:</strong> <input type="number" value="${room[1]}" id="price-${index}"></p>
+                    <p><strong>Disponible:</strong> 
+                        <select id="availability-${index}" onchange="updateAvailability(${index})">
+                            <option value="Sí" ${room[2] === "Sí" ? "selected" : ""}>Sí</option>
+                            <option value="No" ${room[2] === "No" ? "selected" : ""}>No</option>
+                        </select>
+                    </p>
+                    <p><strong>Reservado a:</strong> <input type="text" id="reservation-name-${index}" value="${room[3] || ''}" ${room[2] === 'No' ? 'readonly' : ''}></p>
+                `;
+        
+                roomButton.appendChild(roomDetails);
+                roomGrid.appendChild(roomButton);
+            });
+        
+            // Botón de guardar cambios
+            const saveButton = document.createElement('button');
+            saveButton.innerText = "Guardar Cambios";
+            saveButton.onclick = saveRoomData;
+            roomGrid.appendChild(saveButton);
+        }
+        
+
+        function updateAvailability(index) {
+            const availabilitySelect = document.getElementById(`availability-${index}`);
+            const reservationNameInput = document.getElementById(`reservation-name-${index}`);
+
+            if (availabilitySelect.value === "No") {
+                reservationNameInput.value = "";
+                reservationNameInput.setAttribute("readonly", true);
+            } else {
+                reservationNameInput.removeAttribute("readonly");
+            }
+        }
+
+        function toggleAvailability(index) {
+            const availability = document.getElementById(`availability-${index}`);
+            availability.value = availability.value === "Sí" ? "No" : "Sí";
+            updateAvailability(index);
+        }
+    </script>
+</body>
+</html>
